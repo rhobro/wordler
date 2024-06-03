@@ -1,12 +1,15 @@
 from functools import cmp_to_key
 from random import shuffle
+import requests as rq
 
+
+WORDS_URL = "https://raw.githubusercontent.com/rhobro/wordler/main/words.txt"
 
 
 def main():
     # get word list
-    with open("words.txt", "r") as f:
-        filtered = [w.strip().upper() for w in f.readlines()]
+    rsp = rq.get(WORDS_URL)
+    filtered = [w.upper() for w in rsp.text.split()]
     
     while True:
         # sort for distinct characters
