@@ -1,77 +1,56 @@
-from functools import cmp_to_key
-from random import shuffle
-import requests as rq
-from string import ascii_uppercase
-from math import prod
-from wordfreq import word_frequency as freq
-
-
-WORDS_URL = "https://raw.githubusercontent.com/rhobro/wordler/main/words.txt"
+from bot import *
 
 
 def main():
-    # get word list
-    rsp = rq.get(WORDS_URL)
-    filtered = [w.upper() for w in rsp.text.split()]
-    probs_db = gen_probs(filtered)
+    bot = Bot(comparisons=STRATEGY_ALPHA)
     
     while True:
-        # sort for distinct characters
-        shuffle(filtered)
-        filtered = sorted(filtered, key=cmp_to_key(cmp_distinct_chars))
-        # filtered = sorted(filtered, key=cmp_to_key(gen_cmp_probs(probs_db)))
-        filtered = sorted(filtered, key=cmp_to_key(cmp_more_frequent))
-
+        
         # guess
-        guess = filtered[0]
-        print(f"{guess} - {len(filtered)} words left")
-        if len(filtered) == 1:  # found
+        guess = bot.guess()
+        print(f"\n{guess} - from {bot.n_possibilities} words ({bot.confidence * 100:.2f}%)")
+        if bot.is_finished:
             break
         
         # get correction colours
-        correction = input("Feedback colours (b/y/g): ").lower()[:5]
-        if correction == "ggggg":
-            break
+        correction = input("Feedback colours (b/y/g): ").lower()
+        # check commands
+        if correction[0] == "/":
+            if correction == "/list":
+                bot.show_list()
+            elif correction == "/probs":
+                bot.show_probs()
+            elif correction == "/insight":
+                bot.show_insight()
+            elif correction == "/q":
+                print("Ending session")
+                break
+            continue
         
-        # filter based on colours
-        for i, c in enumerate(correction):
-            if c == "b":
-                # not in word
-                filtered = [w for w in filtered if guess[i] not in w]
-            elif c == "y":
-                # not in that place
-                filtered = [w for w in filtered if w[i] != guess[i] and guess[i] in w]
-            elif c == "g":
-                # in right place
-                filtered = [w for w in filtered if w[i] == guess[i]]
-                
-                
-def gen_probs(words, n_chars=5):
-    res = [{} for _ in range(n_chars)]
-    
-    for i in range(n_chars):
-        full = [w[i] for w in words]
-        for l in ascii_uppercase:
-            res[i][l] = full.count(l) / len(full)
-    
-    return res
+        # feedback
+        bot.feedback(correction)
         
+        
+STRATEGY_FREQUENT_LETTERS = [
+    gen_cmp_alpha_f(),
+    cmp_distinct_chars,
+]
 
-# prioritise words with more distinct chars
-def cmp_distinct_chars(x, y):
-    return len(set(y)) - len(set(x))
+STRATEGY_PLACE_PROBS = [
+    gen_cmp_place_probs(),
+    cmp_distinct_chars,
+]
 
+STRATEGY_FREQUENT = [
+    cmp_frequent,
+    cmp_distinct_chars,
+]
 
-def cmp_more_frequent(x, y):
-    return freq(y, "en") - freq(x, "en")
-
-
-def gen_cmp_probs(db):
-    measure = lambda w: prod([db[i][c] for i, c in enumerate(w)])
-    def cmp(x, y):
-        return measure(y) - measure(x)
-    
-    return cmp
+STRATEGY_ALPHA = [
+    gen_cmp_alpha_f(),
+    cmp_distinct_chars,
+    # gen_cmp_frequent(10),
+]
     
 
 if __name__ == "__main__":
