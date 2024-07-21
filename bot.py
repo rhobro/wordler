@@ -13,17 +13,17 @@ WORDS_FILE = "words.txt"
 
 
 class Bot:
-    def __init__(self, comparisons):
+    def __init__(self, sorts):
         self.filtered = WORDS[:]
-        self.comparisons = comparisons
+        self.sorts = sorts
         
         
     def guess(self):
         # adjust order
         shuffle(self.filtered)
         # apply ordering
-        for comp in self.comparisons:
-            self.filtered = sorted(self.filtered, key=cmp_to_key(comp))
+        for sort in self.sorts:
+            self.filtered = sort(self.filtered)
         
         return self.filtered[0]
     
@@ -90,34 +90,42 @@ class Bot:
         
 
 # prioritise words with more distinct chars
-def cmp_distinct_chars(x, y):
-    return len(set(y)) - len(set(x))
-
-
-# which is more likely
-def cmp_frequent(x, y):
-    return wordf(y, "en") - wordf(x, "en")
-
-# which is more likely
-def gen_cmp_frequent(thresh):
+def sort_distinct_chars(words):
     def cmp(x, y):
-        x_p, y_p = np.float64(wordf(x, "en")), np.float64(wordf(y, "en"))
+        return len(set(y)) - len(set(x))
+    return sorted(words, key=cmp_to_key(cmp))
+
+
+# which is more likely
+def sort_frequent(words):
+    def cmp(x, y):
+        return wordf(y, "en") - wordf(x, "en")
+    return sorted(words, key=cmp_to_key(cmp))
+
+def gen_sort_frequent(threshold):
+    def sort(words):
+        probs = [wordf(w, "en") for w in words]
+        probs.sort(reverse = True)
+        end = probs.index(0.0) if 0.0 in probs else -1
+        probs = probs[:end]  # remove 0.0
+        p = min(probs)
         
-        if 1/thresh < y_p/x_p < thresh:
-            return 0
-        return y_p - x_p
-    
-    return cmp
+        above = [w for w in words if wordf(w, "en") > threshold*p]
+        above = sort_frequent(above)
+        below = [w for w in words if wordf(w, "en") <= threshold*p]
+        below = sort_frequent(below)
+        return above + below
+    return sort
 
 
 # comparison on naive probabilities
-def gen_cmp_place_probs():
+def gen_sort_place_probs():
     db = gen_place_probs_db(WORDS)
     measure = lambda w: prod([db[i][c] for i, c in enumerate(w)])
     def cmp(x, y):
         return measure(y) - measure(x)
     
-    return cmp
+    return lambda words: sorted(words, key=cmp_to_key(cmp))
 def gen_place_probs_db(words, n_chars=WORD_LEN):
     res = [{} for _ in range(n_chars)]
     
@@ -130,13 +138,14 @@ def gen_place_probs_db(words, n_chars=WORD_LEN):
 
 
 # comparison on frequency of letters
-def gen_cmp_alpha_f():
+def gen_sort_alpha_f():
     db = gen_alpha_f_db(WORDS)
     measure = lambda w: sum([db[c] for c in w])
     def cmp(x, y):
         return measure(y) - measure(x)
     
-    return cmp
+    return lambda words: sorted(words, key=cmp_to_key(cmp))
+
 def gen_alpha_f_db(words):
     fs = {}
     catted = "".join(words)
@@ -146,6 +155,28 @@ def gen_alpha_f_db(words):
         
     return fs
 
+
+def from_t(f, n_skip):
+    i = 0
+    def sort(words):
+        nonlocal i
+        i += 1
+        if i <= n_skip:
+            return words
+        return f(words)
+    
+    return sort
+
+def until_t(f, n_skip):
+    i = 0
+    def sort(words):
+        nonlocal i
+        i += 1
+        if i <= n_skip:
+            return f(words)
+        return words
+    
+    return sort
 
 # remote word bank
 # WORDS = [w.upper() for w in get(WORDS_URL).text.split()]

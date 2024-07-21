@@ -2,7 +2,7 @@ from bot import *
 
 
 def main():
-    bot = Bot(comparisons=STRATEGY_ALPHA)
+    bot = Bot(STRATEGY_ALPHA)
     
     while True:
         
@@ -30,26 +30,11 @@ def main():
         # feedback
         bot.feedback(correction)
         
-        
-STRATEGY_FREQUENT_LETTERS = [
-    gen_cmp_alpha_f(),
-    cmp_distinct_chars,
-]
-
-STRATEGY_PLACE_PROBS = [
-    gen_cmp_place_probs(),
-    cmp_distinct_chars,
-]
-
-STRATEGY_FREQUENT = [
-    cmp_frequent,
-    cmp_distinct_chars,
-]
 
 STRATEGY_ALPHA = [
-    gen_cmp_alpha_f(),
-    cmp_distinct_chars,
-    # gen_cmp_frequent(10),
+    gen_sort_alpha_f(),
+    until_t(sort_distinct_chars, 2),
+    from_t(gen_sort_frequent(100), 1),
 ]
     
 
